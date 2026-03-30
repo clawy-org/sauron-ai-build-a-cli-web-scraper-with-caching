@@ -80,6 +80,55 @@ class TestTextExtractor(unittest.TestCase):
         self.assertIn("Body", result)
         self.assertNotIn("Test", result)
 
+    def test_real_world_html_with_meta_tags(self):
+        """Regression: meta/link are void elements - must not break skip depth."""
+        html = textwrap.dedent("""\
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width">
+            <link rel="stylesheet" href="style.css">
+            <title>Test Page</title>
+        </head>
+        <body>
+            <p>This text must be visible</p>
+        </body>
+        </html>
+        """)
+        result = scraper.extract_text(html)
+        self.assertIn("This text must be visible", result)
+        self.assertNotIn("Test Page", result)
+
+    def test_multiple_meta_tags_dont_suppress_body(self):
+        """Many meta tags should not suppress any body content."""
+        html = (
+            "<html><head>"
+            '<meta charset="utf-8">'
+            '<meta name="description" content="Test">'
+            '<meta name="robots" content="index">'
+            '<meta property="og:title" content="OG">'
+            '<link rel="icon" href="favicon.ico">'
+            '<link rel="canonical" href="https://example.com">'
+            "</head><body><h1>Welcome</h1><p>Paragraph text</p></body></html>"
+        )
+        result = scraper.extract_text(html)
+        self.assertIn("Welcome", result)
+        self.assertIn("Paragraph text", result)
+
+    def test_void_elements_outside_head(self):
+        """img, input, etc. as void elements should not affect skip depth."""
+        html = '<p>Before</p><img src="test.png"><p>After</p>'
+        result = scraper.extract_text(html)
+        self.assertIn("Before", result)
+        self.assertIn("After", result)
+
+    def test_noscript_stripped(self):
+        html = "<noscript>Enable JS</noscript><p>Content</p>"
+        result = scraper.extract_text(html)
+        self.assertIn("Content", result)
+        self.assertNotIn("Enable JS", result)
+
 
 class TestUrlHash(unittest.TestCase):
     def test_consistent_hash(self):
@@ -315,6 +364,34 @@ class TestFetchCommand(unittest.TestCase):
             result = scraper.cmd_fetch(args)
         self.assertEqual(result, 1)
         self.assertIn("Timeout", mock_err.getvalue())
+
+    @patch("scraper.fetch_url")
+    def test_fetch_real_world_html(self, mock_fetch):
+        """Regression: ensure real-world HTML with meta tags extracts text."""
+        real_html = textwrap.dedent("""\
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <link rel="stylesheet" href="/css/main.css">
+            <title>Example Domain</title>
+        </head>
+        <body>
+            <h1>Example Domain</h1>
+            <p>This domain is for use in illustrative examples.</p>
+        </body>
+        </html>
+        """)
+        mock_fetch.return_value = (200, {"Content-Type": "text/html"}, real_html)
+        with patch("sys.stdout", new_callable=StringIO) as mock_out:
+            parser = scraper.build_parser()
+            args = parser.parse_args(["fetch", "https://example.com", "--no-cache"])
+            result = scraper.cmd_fetch(args)
+        self.assertEqual(result, 0)
+        output = mock_out.getvalue()
+        self.assertIn("Example Domain", output)
+        self.assertIn("illustrative examples", output)
 
 
 class TestCacheCommand(unittest.TestCase):

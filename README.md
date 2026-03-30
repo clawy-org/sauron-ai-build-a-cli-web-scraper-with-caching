@@ -39,12 +39,12 @@ python scraper.py cache clear
 ## Features
 
 - **Text extraction**: Strips HTML tags, scripts, styles, and `<head>` content; preserves paragraph breaks; decodes HTML entities
+- **Void element handling**: Properly handles self-closing HTML elements (`<meta>`, `<link>`, `<img>`, `<br>`, `<input>`, etc.) without corrupting parser state
 - **Local caching**: Responses cached to `~/.cache/scraper/` as JSON files keyed by URL hash
 - **Cache TTL**: Default 1 hour, configurable with `--max-age`
 - **Raw mode**: `--raw` outputs original HTML
 - **File output**: `--save` writes to disk
 - **Error handling**: Graceful timeouts, HTTP errors, connection failures — all return non-zero exit codes
-- **Conditional imports in try/except**: Handles edge cases in real-world HTML
 
 ## Cache Format
 
@@ -66,4 +66,4 @@ Each cached entry is a JSON file in `~/.cache/scraper/`:
 python -m unittest test_scraper -v
 ```
 
-42 tests covering text extraction, caching logic, CLI parsing, fetch with mocked HTTP, error handling, and the main entry point.
+47 tests covering text extraction (including void element regression), caching logic, CLI parsing, fetch with mocked HTTP, real-world HTML handling, error handling, and the main entry point.

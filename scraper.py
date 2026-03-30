@@ -28,7 +28,12 @@ DEFAULT_TIMEOUT = 10
 class TextExtractor(html.parser.HTMLParser):
     """Extract readable text from HTML, stripping tags, scripts, and styles."""
 
-    SKIP_TAGS = {"script", "style", "head", "meta", "link", "noscript"}
+    SKIP_TAGS = {"script", "style", "head", "noscript"}
+    # Void elements that never get a closing tag — must not affect skip depth
+    VOID_ELEMENTS = {
+        "area", "base", "br", "col", "embed", "hr", "img", "input",
+        "link", "meta", "param", "source", "track", "wbr",
+    }
     BLOCK_TAGS = {
         "p", "div", "br", "h1", "h2", "h3", "h4", "h5", "h6",
         "li", "tr", "blockquote", "pre", "hr", "section", "article",
@@ -43,6 +48,9 @@ class TextExtractor(html.parser.HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         tag_lower = tag.lower()
+        # Void elements should never affect skip depth
+        if tag_lower in self.VOID_ELEMENTS:
+            return
         if tag_lower in self.SKIP_TAGS:
             self._skip_depth += 1
         elif tag_lower in self.BLOCK_TAGS and not self._skip_depth:
@@ -50,6 +58,8 @@ class TextExtractor(html.parser.HTMLParser):
 
     def handle_endtag(self, tag):
         tag_lower = tag.lower()
+        if tag_lower in self.VOID_ELEMENTS:
+            return
         if tag_lower in self.SKIP_TAGS:
             self._skip_depth = max(0, self._skip_depth - 1)
         elif tag_lower in self.BLOCK_TAGS and not self._skip_depth:
